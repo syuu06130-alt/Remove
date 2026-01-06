@@ -1,65 +1,59 @@
+--[[
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+  SCRIPT 1: LegRemoverServer
+  場所: ServerScriptService
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+]]
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
 
--- RemoteEvent作成
-local remoteEvent = ReplicatedStorage:FindFirstChild("RemoveLegEvent")
+-- RemoteEventの作成（なければ作る）
+local eventName = "RemoveLegEvent"
+local remoteEvent = ReplicatedStorage:FindFirstChild(eventName)
 if not remoteEvent then
 	remoteEvent = Instance.new("RemoteEvent")
-	remoteEvent.Name = "RemoveLegEvent"
+	remoteEvent.Name = eventName
 	remoteEvent.Parent = ReplicatedStorage
 end
 
--- 脚パーツ一覧
-local LEG_PARTS = {
-	Left = {
-		R6 = {"Left Leg"},
-		R15 = {"LeftUpperLeg", "LeftLowerLeg", "LeftFoot"}
-	},
-	Right = {
-		R6 = {"Right Leg"},
-		R15 = {"RightUpperLeg", "RightLowerLeg", "RightFoot"}
-	}
+-- R6とR15の脚パーツリスト
+local R6_LEGS = {
+	Left = {"Left Leg"},
+	Right = {"Right Leg"}
 }
 
-local function removeLeg(player, side) -- side: "Left" or "Right"
+local R15_LEGS = {
+	Left = {"LeftUpperLeg", "LeftLowerLeg", "LeftFoot"},
+	Right = {"RightUpperLeg", "RightLowerLeg", "RightFoot"}
+}
+
+-- 脚を削除する関数
+local function removeLeg(player, legSide)
 	local character = player.Character
-	if not character or not character:FindFirstChild("Humanoid") then
-		return false, "Character not loaded"
-	end
+	if not character then return end
+	
+	local humanoid = character:FindFirstChild("Humanoid")
+	if not humanoid then return end
 
-	local humanoid = character.Humanoid
+	-- R15かR6かを判定
 	local isR15 = humanoid.RigType == Enum.HumanoidRigType.R15
-	local rigType = isR15 and "R15" or "R6"
-	local partsList = LEG_PARTS[side][isR15 and "R15" or "R6"]
+	local partsToRemove = isR15 and R15_LEGS[legSide] or R6_LEGS[legSide]
 
-	local removed = 0
-	for _, partName in ipairs(partsList) do
-		local part = character:FindFirstChild(partName)
-		if part then
-			part:Destroy()
-			removed = removed + 1
+	if partsToRemove then
+		for _, partName in ipairs(partsToRemove) do
+			local part = character:FindFirstChild(partName)
+			if part then
+				part:Destroy() -- パーツを破壊
+			end
 		end
-	end
-
-	if removed > 0 then
-		-- R15の場合、足がなくなった分だけHipHeightを下げる（見た目を自然に）
-		if isR15 then
-			humanoid.HipHeight = humanoid.HipHeight - 2 -- 調整値（必要に応じて変更）
-		end
-		return true, side .. " leg removed (" .. rigType .. ")"
-	else
-		return false, "No leg parts found"
 	end
 end
 
-remoteEvent.OnServerEvent:Connect(function(player, side)
-	if side ~= "Left" and side ~= "Right" then return end
-
-	local success, msg = removeLeg(player, side)
-	if success then
-		print(player.Name .. ": " .. msg)
-	else
-		warn(player.Name .. ": Failed - " .. msg)
+-- クライアントからの要求を受け取る
+remoteEvent.OnServerEvent:Connect(function(player, legSide)
+	if legSide == "Left" or legSide == "Right" then
+		removeLeg(player, legSide)
+		print(player.Name .. " の " .. legSide .. " 足を削除しました。")
 	end
 end)
 
-print("✅ LegRemoverServer loaded!")
+print("✅ Leg Remover Server Script Loaded")
